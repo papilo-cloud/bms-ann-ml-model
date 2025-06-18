@@ -9,29 +9,32 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # 1. Generate Synthetic Battery Data
-np.random.seed(42)
-n_samples = 500
-voltage = np.random.uniform(3.0, 4.2, n_samples)
-current = np.random.uniform(0.0, 2.0, n_samples)
-temperature = np.random.uniform(20, 45, n_samples)
-soc = np.random.uniform(0.1, 1.0, n_samples)
-soh = np.random.uniform(0.8, 1.0, n_samples)
-sop = np.random.uniform(0.5, 1.0, n_samples)
-rul = np.random.uniform(50, 1000, n_samples)
+# np.random.seed(42)
+# n_samples = 500
+# voltage = np.random.uniform(3.0, 4.2, n_samples)
+# current = np.random.uniform(0.0, 2.0, n_samples)
+# temperature = np.random.uniform(20, 45, n_samples)
+# soc = np.random.uniform(0.1, 1.0, n_samples)
+# soh = np.random.uniform(0.8, 1.0, n_samples)
+# sop = np.random.uniform(0.5, 1.0, n_samples)
+# rul = np.random.uniform(50, 1000, n_samples)
 
-df = pd.DataFrame({
-    'Voltage': voltage,
-    'Current': current,
-    'Temperature': temperature,
-    'SOC': soc,
-    'SOH': soh,
-    'SOP': sop,
-    'RUL': rul
-})
+# df = pd.DataFrame({
+#     'Voltage': voltage,
+#     'Current': current,
+#     'Temperature': temperature,
+#     'SOC': soc,
+#     'SOH': soh,
+#     'SOP': sop,
+#     'RUL': rul
+# })
+
+# Loads data from a CSV
+df = pd.read_csv('battery_datas.csv')
 
 # 2. Features and Targets
 X = df[['Voltage', 'Current', 'Temperature']]
-y = df[['SOC', 'SOH', 'SOP', 'RUL']]
+y = df[['SOC', 'SOH', 'SOP']]
 
 # 3. Normalize
 scaler_X = MinMaxScaler()
@@ -52,16 +55,16 @@ Y_test = torch.tensor(Y_test, dtype=torch.float32)
 class BatteryANN(nn.Module):
     def __init__(self):
         super(BatteryANN, self).__init__()
-        self.net = nn.Sequential(
+        self.model = nn.Sequential(
             nn.Linear(3, 64),
             nn.ReLU(),
             nn.Linear(64, 64),
             nn.ReLU(),
-            nn.Linear(64, 4)
+            nn.Linear(64, 3)
         )
 
     def forward(self, x):
-        return self.net(x)
+        return self.model(x)
 
 model = BatteryANN()
 loss_fn = nn.MSELoss()
@@ -69,8 +72,8 @@ optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 # 7. Train Model
 losses = []
-epochs = 200
-for epoch in range(epochs):
+num_epochs = 200
+for epoch in range(num_epochs):
     model.train()
     optimizer.zero_grad()
     outputs = model(X_train)
@@ -79,7 +82,7 @@ for epoch in range(epochs):
     optimizer.step()
     losses.append(loss.item())
     if (epoch + 1) % 20 == 0:
-        print(f"Epoch {epoch+1}/{epochs}, Loss: {loss.item():.6f}")
+        print(f"Epoch {epoch+1}/{num_epochs}, Loss: {loss.item():.6f}")
 
 # 8. Evaluate
 model.eval()
@@ -92,16 +95,32 @@ with torch.no_grad():
     rmse = np.sqrt(mean_squared_error(Y_test_inv, predictions_inv, multioutput='raw_values'))
     r2 = r2_score(Y_test_inv, predictions_inv, multioutput='raw_values')
 
-    metrics = ['SOC', 'SOH', 'SOP', 'RUL']
+    labels = ['SOC', 'SOH', 'SOP']
     print("\nModel Evaluation:")
-    for i, metric in enumerate(metrics):
+    for i, metric in enumerate(labels):
         print(f"{metric} => MAE: {mae[i]:.4f}, RMSE: {rmse[i]:.4f}, R2: {r2[i]:.4f}")
 
-# 9. Plot Loss Curve
-plt.plot(losses)
+# ======= 9. Plot Training Loss =========
+plt.figure(figsize=(7, 4))
+plt.plot(range(num_epochs), losses)
 plt.title("Training Loss Over Epochs")
 plt.xlabel("Epoch")
 plt.ylabel("Loss (MSE)")
+plt.title("Training Loss Over Epochs")
 plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# ======= 10. Plot Actual vs Predicted for Each Target ========
+plt.figure(figsize=(12, 4))
+for i in range(3):
+    plt.subplot(1, 3, i+1)
+    plt.plot(Y_test_inv[:, i], label='Actual', marker='o', linestyle='--', alpha=0.7)
+    plt.plot(predictions[:, i], label='Predicted', marker='x', linestyle='-', alpha=0.7)
+    plt.title(f'{labels[i]} Prediction')
+    plt.xlabel('Sample')
+    plt.ylabel(labels[i])
+    plt.legend()
+    plt.grid(True)
 plt.tight_layout()
 plt.show()
